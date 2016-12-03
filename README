@@ -1,0 +1,4 @@
+This is the configuration directory for the anagrammar command line utility.
+If you can see this file, anagrammar is probably installed on your system. You
+can get more details by running anagrammar --help. This file describes the rules
+of anagrammar grammars.
