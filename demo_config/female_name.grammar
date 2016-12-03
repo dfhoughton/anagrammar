@@ -1,0 +1,13 @@
+female_namei       -> female_first_part last_part?
+female_name        -> last_part
+female_first_part  -> <female_title> female_post_title?
+female_first_part  -> female_post_title
+female_post_title  -> <female> female_middle_part?
+female_post_title  -> female_middle_part
+female_middle_part -> <initial>{1,3}
+female_middle_part -> <female>{1,2} <surname>{1,2}
+female_middle_part -> <female>{1,2}
+female_middle_part -> <surname>{1,2}
+
+last_part -> <epithet>? <surname> <suffix>?
+
