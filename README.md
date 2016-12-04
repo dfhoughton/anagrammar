@@ -19,8 +19,7 @@ this:
 
 into a finite state automaton like this:
 
-![Image of FSA]
-(https://github.com/dfhoughton/anagrammar/blob/master/female_names.svg)
+![female_names](https://cloud.githubusercontent.com/assets/177421/20863030/e0f650a6-b98a-11e6-84ef-6c2291dea52f.png)
 
 compile the necessary wordlists into tries, and then generate from a particular phrase
 all the anagrams of that phrase that fit within the wordlists and grammar.
