@@ -4,8 +4,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import dfh.anagrammar.node.End;
 import dfh.anagrammar.node.Node;
@@ -36,9 +34,7 @@ public class WorkInProgress {
 		this(n.trie, n, cc.dup(), null, true);
 	}
 	
-	public void work(Deque<WorkInProgress> queue, AtomicInteger activityCounter) {
-		activityCounter.incrementAndGet();
-		boolean addedNothing = true;
+	public void work(Deque<WorkInProgress> queue) {
 		if (n instanceof End) {
 			((End) n).getOutput().add(this);
 		} else {
@@ -53,7 +49,6 @@ public class WorkInProgress {
 						if (cc2 != null) {
 							Trie t2 = term.trie.children[i];
 							WorkInProgress wip = new WorkInProgress(t2, term, cc2, this, false);
-							addedNothing = false;
 							queue.addFirst(wip);
 							if (t2.terminal && t2.children.length > 0) {
 								wip = new WorkInProgress(t2, term, cc2, this, false);
@@ -65,7 +60,6 @@ public class WorkInProgress {
 							if (o2 instanceof Terminal) {
 								Terminal term2 = (Terminal) o2;
 								WorkInProgress wip = new WorkInProgress(term2.trie, o2, cc, this, true);
-								addedNothing = false;
 								queue.addFirst(wip);
 							} else { // must be End
 								End e = (End) o2;
@@ -76,9 +70,6 @@ public class WorkInProgress {
 				}
 			}
 		}
-		if (addedNothing)
-			queue.add(null); // to prevent stalling of the process upon completion
-		activityCounter.decrementAndGet();
 	}
 
 	/**

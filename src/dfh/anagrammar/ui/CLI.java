@@ -35,7 +35,6 @@ import dfh.anagrammar.node.Terminal;
 import dfh.anagrammar.ui.Yamlizer.ConfigurationNode;
 import dfh.cli.Cli;
 import dfh.cli.rules.Range;
-import dfh.thread.ThreadPuddle;
 
 public class CLI {
 	private static ConfigurationNode config;
@@ -125,15 +124,21 @@ public class CLI {
 		BlockingQueue<WorkInProgress> queue = new LinkedBlockingQueue<>();
 		End e = (End) p.out;
 		e.setOutput(queue);
+		AtomicInteger activityCounter = new AtomicInteger();
 		Thread t = new Thread(() -> {
 			while (true) {
 				WorkInProgress wip = queue.remove();
+				activityCounter.incrementAndGet();
 				for (List<String> phrase: wip.phrases()) {
 					for (String s: phrase) {
 						System.out.print(s);
 						System.out.print(' ');
 					}
 					System.out.println();
+				}
+				synchronized (activityCounter) {
+					activityCounter.decrementAndGet();
+					activityCounter.notifyAll();
 				}
 			}
 		});
@@ -146,14 +151,31 @@ public class CLI {
 				deque.addLast(wip);
 			}
 		}
-		AtomicInteger activityCounter = new AtomicInteger();
-		ThreadPuddle puddle = new ThreadPuddle(cli.integer("threads"));
-		while (!deque.isEmpty() || activityCounter.get() > 0) {
-			WorkInProgress wip = deque.remove();
-			if (wip == null) continue;
-			puddle.run(() ->{
-				wip.work(deque, activityCounter);
+		for (int i = 0; i < cli.integer("threads"); i++) {
+			Thread t2 = new Thread(()->{
+				while (true) {
+					WorkInProgress wip = deque.remove();
+					activityCounter.incrementAndGet();
+					wip.work(deque);
+					synchronized (activityCounter) {
+						activityCounter.decrementAndGet();
+						activityCounter.notifyAll();
+					}
+				}
 			});
+			t2.setDaemon(true);
+			t2.start();
+		}
+		// keep the main thread alive until all the work is done
+		synchronized (activityCounter) {
+			while (!(deque.isEmpty() || queue.isEmpty() || activityCounter.get() == 0)) {
+				try {
+					activityCounter.wait(1000);
+				} catch (InterruptedException e1) {
+					System.out.println("interrupted; exiting...");
+					System.exit(1);
+				}
+			}
 		}
 	}
 
