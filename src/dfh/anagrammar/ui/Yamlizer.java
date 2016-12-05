@@ -29,14 +29,14 @@ public class Yamlizer {
 		private static final int DEPTH = 2;
 		private static final Pattern depthPattern = Pattern.compile("^((?: {" + DEPTH + "})*)\\S");
 		private static final Pattern commentPattern = Pattern.compile("^\\s*#");
-		private static final Pattern keyPattern = Pattern.compile("(\\w+)(?::\\s*(\\S.*?))?\\s*$");
+		private static final Pattern keyPattern = Pattern.compile("(\\w+):(?:\\s*(\\S.*?))?\\s*$");
 		private static final Pattern pathPattern = Pattern.compile("^(\\w+)(?:\\.(.*))?");
 		private static final Pattern anythingPattern = Pattern.compile("\\S");
 		String name, value;
 		boolean comment = false;
 		ConfigurationNode parent;
-		Map<String, ConfigurationNode> children = new LinkedHashMap<>();
-		int depth;
+		LinkedHashMap<String, ConfigurationNode> children = new LinkedHashMap<>();
+		int depth, childDepth = -1;
 
 		static ConfigurationNode rootNode() {
 			return new ConfigurationNode(null, null, null, true);
@@ -49,8 +49,12 @@ public class Yamlizer {
 			this.comment = comment;
 			if (parent == null)
 				depth = -2;
-			else
-				depth = DEPTH + parent.depth;
+			else {
+				if (parent.childDepth == -1) {
+					parent.childDepth = parent.depth + DEPTH;
+				}
+				depth = parent.childDepth;
+			}
 		}
 
 		boolean isRoot() {
@@ -60,32 +64,36 @@ public class Yamlizer {
 		ConfigurationNode parse(String line) throws BadConfigurationException {
 			if (commentPattern.matcher(line).lookingAt())
 				return this;
-			if (!anythingPattern.matcher(line).matches()) // ignore blank lines
+			if (!anythingPattern.matcher(line).find()) // ignore blank lines
 				return this;
 			Matcher m = depthPattern.matcher(line);
 			if (m.lookingAt()) {
-				int depth = m.group(1).length() / DEPTH;
+				int depth = m.group(1).length();
 				int offset = m.end(1);
 				m = keyPattern.matcher(line);
 				m.region(offset, line.length());
 				if (m.lookingAt()) {
 					String name = m.group(1), value = m.group(2);
-					if (depth == this.depth + DEPTH) {
+					if (depth == this.childDepth || this.childDepth == -1 && depth > this.depth) {
 						ConfigurationNode child = new ConfigurationNode(name, value, this, false);
 						addChild(child);
-						return this;
-					} else if (depth > this.depth) {
-						throw new BadConfigurationException("line: " + line);
+						return child;
+					} else if (this.childDepth != -1 && depth > this.childDepth) {
+						ConfigurationNode n = lastChild();
+						ConfigurationNode child = new ConfigurationNode(name, value, n, false);
+						n.addChild(child);
+						return child;
 					} else {
 						ConfigurationNode n = this.parent;
-						while (n != null && n.depth < depth - DEPTH) {
+						while (n != null && n.childDepth > depth) {
 							n = n.parent;
 						}
 						if (n == null)
-							throw new BadConfigurationException("line: " + line);
+							throw new BadConfigurationException(
+									"cannot find parent configuration key for line: " + line);
 						ConfigurationNode child = new ConfigurationNode(name, value, n, false);
 						n.addChild(child);
-						return n;
+						return child;
 					}
 				} else {
 					throw new BadConfigurationException("line: " + line);
@@ -93,6 +101,16 @@ public class Yamlizer {
 			} else {
 				return null;
 			}
+		}
+
+		private ConfigurationNode lastChild() {
+			ConfigurationNode n = null;
+			// the linked hashmap should preserve insertion order
+			// I'd think the collection would therefore expose a method which lets you do this
+			// directly, but if so I missed it
+			for (ConfigurationNode n2: children.values())
+				n = n2;
+			return n;
 		}
 
 		private void addChild(ConfigurationNode child) {

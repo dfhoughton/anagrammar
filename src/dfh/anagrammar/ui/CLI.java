@@ -77,7 +77,7 @@ public class CLI {
 				checkConfig();
 				String defaultGrammar = config().getValue("grammars.default");
 				System.out.println("available grammars:");
-				for (String g : config.getKeys("grammars.definitions")) {
+				for (String g : config().getKeys("grammars.definitions")) {
 					System.out.print("  ");
 					System.out.print(g);
 					if (g.equals(defaultGrammar))
