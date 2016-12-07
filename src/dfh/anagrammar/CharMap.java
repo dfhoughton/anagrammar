@@ -58,7 +58,7 @@ public class CharMap {
 		public void add(String[] words) {
 			for (String w : words) {
 				for (int i = 0; i < w.length(); i++) {
-					Character c = w.charAt(normalizer.normalize(w.charAt(i)));
+					char c = normalizer.normalize(w.charAt(i));
 					if (c == 0)
 						continue;
 					AtomicInteger a = counter.get(c);

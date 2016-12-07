@@ -11,27 +11,20 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import dfh.anagrammar.CharCount;
 import dfh.anagrammar.CharMap;
 import dfh.anagrammar.CharMap.Builder;
-import dfh.anagrammar.Trie;
+import dfh.anagrammar.Engine;
+import dfh.anagrammar.OutputHandler;
 import dfh.anagrammar.WorkInProgress;
 import dfh.anagrammar.grammar.BadRuleException;
 import dfh.anagrammar.grammar.Grammar;
 import dfh.anagrammar.grammar.RecursionException;
-import dfh.anagrammar.node.End;
 import dfh.anagrammar.node.MissingWordlistException;
-import dfh.anagrammar.node.Node;
 import dfh.anagrammar.node.Pipe;
-import dfh.anagrammar.node.Terminal;
 import dfh.anagrammar.ui.Yamlizer.ConfigurationNode;
 import dfh.cli.Cli;
 import dfh.cli.rules.Range;
@@ -58,6 +51,7 @@ public class CLI {
 		};
 		cli = new Cli(spec);
 		cli.parse(args);
+		
 		boolean didSomething = false;
 		if (cli.bool("initialize")) {
 			didSomething = true;
@@ -93,125 +87,58 @@ public class CLI {
 			return;
 		try {
 			checkConfig();
+			if (cli.argList().isEmpty())
+				cli.die("Cannot make anagrams if no phrase is provided.");
+			StringBuffer buffer = new StringBuffer();
+			for (String s: cli.argList()) buffer.append(s).append(' ');
+			String inputPhrase = buffer.toString().trim();
+			System.out.println("collecting anagrammas of " + inputPhrase);
+			System.out.println();
 			String grammar;
 			if (cli.isSet("grammar"))
 				grammar = cli.string("grammar");
 			else
 				grammar = config().getValue("grammars.default");
 			Pipe p = getGrammar(grammar);
-			if (cli.argList().isEmpty())
-				cli.die("Cannot make anagrams if no phrase is provided.");
-			Map<String, Trie> catalog = new HashMap<>();
+			Map<String, List<String>> wordLists = getWordLists(p.requiredTries());
 			Builder b = new CharMap.Builder();
-			Collection<String> lists = p.requiredTries();
-			for (String listName : lists)
-				addWords(listName, b);
-			CharMap cm = b.build();
-			for (String listName : lists) {
-				catalog.put(listName, makeTrie(listName, cm));
-			}
-			p.attachTries(catalog);
-			findAnagrams(p, cm);
+			Engine e = new Engine(cli.integer("threads"), 10000, wordLists, p, b);
+			e.run(inputPhrase, new OutputHandler() {
+				@Override
+				public void handle(WorkInProgress wip) {
+					for (List<String> phrase: wip.phrases()) {
+						for (String word: phrase) {
+							System.out.print(word);
+							System.out.print(' ');
+						}
+						System.out.println();
+					}
+				}
+			});
 		} catch (IOException | BadConfigurationException | BadRuleException | RecursionException
 				| MissingWordlistException e) {
 			cli.die(e.getMessage());
 		}
 	}
 
-	private static void findAnagrams(Pipe p, CharMap cm) {
-		CharCount cc = cm.count(cli.argList());
-		BlockingDeque<WorkInProgress> deque = new LinkedBlockingDeque<>(10000);
-		BlockingQueue<WorkInProgress> queue = new LinkedBlockingQueue<>();
-		End e = (End) p.out;
-		e.setOutput(queue);
-		AtomicInteger activityCounter = new AtomicInteger();
-		Thread t = new Thread(() -> {
-			while (true) {
-				WorkInProgress wip = queue.remove();
-				activityCounter.incrementAndGet();
-				for (List<String> phrase: wip.phrases()) {
-					for (String s: phrase) {
-						System.out.print(s);
-						System.out.print(' ');
-					}
-					System.out.println();
-				}
-				synchronized (activityCounter) {
-					activityCounter.decrementAndGet();
-					activityCounter.notifyAll();
-				}
-			}
-		});
-		t.setDaemon(true);
-		t.start();
-		for (Node n: p.in.edges) {
-			if (n instanceof Terminal) {
-				Terminal term = (Terminal) n;
-				WorkInProgress wip = new WorkInProgress(term, cc);
-				deque.addLast(wip);
+	private static Map<String, List<String>> getWordLists(Collection<String> requiredTries) throws BadConfigurationException, IOException {
+		Map<String, List<String>> wordLists = new HashMap<>();
+		for (String listName: requiredTries) {
+			List<String> words = new LinkedList<>();
+			wordLists.put(listName, words);
+			String path = config().getValue("word_lists." + listName);
+			File f = new File(configurationDirectory(), path);
+			if (f.exists()) {
+				BufferedReader reader = new BufferedReader(new FileReader(f));
+				String line;
+				while ((line = reader.readLine()) != null)
+					words.add(line.trim());
+				reader.close();
+			} else {
+				throw new BadConfigurationException("cannot find file of words for " + listName);
 			}
 		}
-		for (int i = 0; i < cli.integer("threads"); i++) {
-			Thread t2 = new Thread(()->{
-				while (true) {
-					WorkInProgress wip = deque.remove();
-					activityCounter.incrementAndGet();
-					wip.work(deque);
-					synchronized (activityCounter) {
-						activityCounter.decrementAndGet();
-						activityCounter.notifyAll();
-					}
-				}
-			});
-			t2.setDaemon(true);
-			t2.start();
-		}
-		// keep the main thread alive until all the work is done
-		synchronized (activityCounter) {
-			while (!(deque.isEmpty() || queue.isEmpty() || activityCounter.get() == 0)) {
-				try {
-					activityCounter.wait(1000);
-				} catch (InterruptedException e1) {
-					System.out.println("interrupted; exiting...");
-					System.exit(1);
-				}
-			}
-		}
-	}
-
-	private static void addWords(String listName, Builder b) throws BadConfigurationException, IOException {
-		String path = config().getValue("word_lists." + listName);
-		File f = new File(configurationDirectory(), path);
-		if (f.exists()) {
-			BufferedReader reader = new BufferedReader(new FileReader(f));
-			List<String> words = new ArrayList<>();
-			String line;
-			while ((line = reader.readLine()) != null)
-				words.add(line);
-			reader.close();
-			b.add(words);
-		} else {
-			throw new BadConfigurationException("cannot find file of words for " + listName);
-		}
-	}
-
-	private static Trie makeTrie(String listName, CharMap cm) throws BadConfigurationException, IOException {
-		String path = config().getValue("word_lists." + listName);
-		File f = new File(configurationDirectory(), path);
-		if (f.exists()) {
-			BufferedReader reader = new BufferedReader(new FileReader(f));
-			Trie t = new Trie();
-			String line;
-			while ((line = reader.readLine()) != null) {
-				line = line.trim();
-				int[] translation = cm.translate(line);
-				t.add(line, translation, 0);
-			}
-			reader.close();
-			return t;
-		} else {
-			throw new BadConfigurationException("cannot find file of words for " + listName);
-		}
+		return wordLists;
 	}
 
 	private static Pipe getGrammar(String grammar)

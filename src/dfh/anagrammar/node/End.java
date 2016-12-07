@@ -1,17 +1,17 @@
 package dfh.anagrammar.node;
 
-import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
 
 import dfh.anagrammar.WorkInProgress;
 
 public class End extends Node {
-	private Queue<WorkInProgress> output;
+	private BlockingQueue<WorkInProgress> output;
 
-	public Queue<WorkInProgress> getOutput() {
+	public BlockingQueue<WorkInProgress> getOutput() {
 		return output;
 	}
 
-	public void setOutput(Queue<WorkInProgress> output) {
+	public void setOutput(BlockingQueue<WorkInProgress> output) {
 		this.output = output;
 	}
 
