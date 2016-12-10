@@ -3,6 +3,7 @@ package dfh.anagrammar.ui;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -11,9 +12,13 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
 
 import dfh.anagrammar.CharMap;
 import dfh.anagrammar.CharMap.Builder;
@@ -27,32 +32,58 @@ import dfh.anagrammar.node.MissingWordlistException;
 import dfh.anagrammar.node.Pipe;
 import dfh.anagrammar.ui.Yamlizer.ConfigurationNode;
 import dfh.cli.Cli;
+import dfh.cli.coercions.FileCoercion;
 import dfh.cli.rules.Range;
 
 public class CLI {
 	private static ConfigurationNode config;
 	private static Cli cli;
+	private static PrintStream out = System.out;
 
 	public static void main(String[] args) {
 		Object[][][] spec = {
 				//
 				{ { Cli.Opt.USAGE, "compute the anagrams of a phrase that obey a specified grammar" },
 						{ "usage.txt" } }, //
-				{ { Cli.Opt.ARGS, "word", Cli.Opt.STAR } }, //
+				{ { Cli.Opt.ARGS, "word", Cli.Opt.PLUS } }, //
 				{ { Cli.Opt.NAME, "anagrammar" } }, //
 				{ { Cli.Opt.VERSION, "0.0.1" } }, //
 				{ { "initialize" }, { "generate a skeleton configuration file in " + configurationDirectory()
 						+ "; you must then modify this configuration file to specify grammars and word lists" } }, //
 				{ { "force" }, { "in conjunction with --initialize, this overwrites an existing configuration file" } }, //
+				{ { "out", 'o', FileCoercion.C }, { "dump output -- anagrams or Graphviz spec -- into this file" } }, //
+				{ { "sample", 's', Integer.class }, { "produce only a sample of anagrams" }, { Range.positive() } }, //
+				{ { "random", 'r' },
+						{ "generate anagrams in random order; "
+								+ "WARNING: this will slow the generation of any anagrams considerably" } }, //
 				{ { "list", 'l' }, { "list available grammars" } }, //
 				{ { "grammar", 'g', String.class }, { "specify a grammar to use" } }, //
-				{ { "threads", Integer.class, Runtime.getRuntime().availableProcessors() + 1 },
-						{ "maximum number of threads" }, { Range.positive() } },//
+				{ { "word-lists" }, { "show the list of word lists used by the grammars" } }, //
+				{ { "dot" },
+						{ "print out a Graphviz graph specification for the "
+								+ "finite state automaton representation of a grammar" } }, //
+				{ { "unique", 'u' },
+						{ "in case the grammar can produce the same phrase in more than one way, "
+								+ "this ensures that each name is only listed once; "
+								+ "NOTE: for the sake of memory efficiency and speed, hashcodes are used to determine uniqueness, "
+								+ "so some anagrams may be dropped altogether" } }, //
+				{ { "threads", Integer.class, Runtime.getRuntime().availableProcessors() },
+						{ "maximum number of threads" }, { Range.positive() } }, //
+				{ { "count", 'c' }, { "print out the number of anagrams found" } },//
 		};
 		cli = new Cli(spec);
 		cli.parse(args);
-		
+
 		boolean didSomething = false;
+		boolean unique = cli.bool("unique");
+		if (cli.isSet("out")) {
+			File outFile = (File) cli.object("out");
+			try {
+				out = new PrintStream(new BufferedOutputStream(new FileOutputStream(outFile)), true);
+			} catch (FileNotFoundException e) {
+				cli.die("could not write to " + outFile);
+			}
+		}
 		if (cli.bool("initialize")) {
 			didSomething = true;
 			try {
@@ -83,6 +114,51 @@ public class CLI {
 				cli.die("could not list available grammars: " + e.getMessage());
 			}
 		}
+		if (cli.bool("word-lists")) {
+			didSomething = true;
+			try {
+				checkConfig();
+				System.out.println("available word lists:");
+				Map<String, String> wordLists = new TreeMap<>();
+				for (String w : config.getKeys("word_lists")) {
+					String v = config.getValue("word_lists." + w);
+					wordLists.put(w, v);
+				}
+				if (wordLists.isEmpty())
+					System.out.println("no word lists configured!");
+				else {
+					int nm = -1;
+					for (String s : wordLists.keySet()) {
+						int n = s.length() + 1;
+						if (n > nm)
+							nm = n;
+					}
+					for (Entry<String, String> e : wordLists.entrySet()) {
+						System.out.printf("  %-" + nm + "s %s\n", e.getKey() + ':', e.getValue());
+					}
+				}
+			} catch (IOException | BadConfigurationException e) {
+				cli.die("could not list available word lists:" + e.getMessage());
+			}
+		}
+		if (cli.bool("dot")) {
+			didSomething = true;
+			try {
+				checkConfig();
+				String grammar;
+				if (cli.isSet("grammar"))
+					grammar = cli.string("grammar");
+				else
+					grammar = config().getValue("grammars.default");
+				if (grammar == null)
+					cli.die("grammar " + grammar + " is not defined in the configuration file " + configFile());
+				Pipe p = getGrammar(grammar);
+				out.println(p.graphvizDOT(grammar));
+				out.flush();
+			} catch (IOException | BadConfigurationException | BadRuleException | RecursionException e) {
+				cli.die("could not produce dot file: " + e.getMessage());
+			}
+		}
 		if (didSomething)
 			return;
 		try {
@@ -90,9 +166,10 @@ public class CLI {
 			if (cli.argList().isEmpty())
 				cli.die("Cannot make anagrams if no phrase is provided.");
 			StringBuffer buffer = new StringBuffer();
-			for (String s: cli.argList()) buffer.append(s).append(' ');
+			for (String s : cli.argList())
+				buffer.append(s).append(' ');
 			String inputPhrase = buffer.toString().trim();
-			System.out.println("collecting anagrammas of " + inputPhrase);
+			System.out.println("collecting anagrams of " + inputPhrase);
 			System.out.println();
 			String grammar;
 			if (cli.isSet("grammar"))
@@ -102,28 +179,45 @@ public class CLI {
 			Pipe p = getGrammar(grammar);
 			Map<String, List<String>> wordLists = getWordLists(p.requiredTries());
 			Builder b = new CharMap.Builder();
-			Engine e = new Engine(cli.integer("threads"), wordLists, p, b);
+			int sample = cli.isSet("sample") ? cli.integer("sample") : -1;
+			Engine e = new Engine(cli.integer("threads"), sample, cli.bool("random"), wordLists, p, b);
+			Set<Integer> seen = new HashSet<>();
 			e.run(inputPhrase, new OutputHandler() {
 				@Override
 				public void handle(WorkInProgress wip) {
-					for (List<String> phrase: wip.phrases()) {
-						for (String word: phrase) {
-							System.out.print(word);
-							System.out.print(' ');
+					for (List<String> phrase : wip.phrases()) {
+						StringBuffer b = new StringBuffer();
+						for (String word : phrase) {
+							b.append(word);
+							b.append(' ');
 						}
-						System.out.println();
+						String w = b.toString().trim();
+						if (w.length() > 0) {
+							if (unique) {
+								Integer i = w.hashCode();
+								if (!seen.contains(i)) {
+									seen.add(i);
+									out.println(w);
+								}
+							} else
+								out.println(w);
+						}
 					}
 				}
 			});
+			out.flush();
+			if (cli.bool("count"))
+				System.out.printf("\nfound %d anagram%s\n", e.found(), e.found() == 1 ? "" : "s");
 		} catch (IOException | BadConfigurationException | BadRuleException | RecursionException
 				| MissingWordlistException e) {
 			cli.die(e.getMessage());
 		}
 	}
 
-	private static Map<String, List<String>> getWordLists(Collection<String> requiredTries) throws BadConfigurationException, IOException {
+	private static Map<String, List<String>> getWordLists(Collection<String> requiredTries)
+			throws BadConfigurationException, IOException {
 		Map<String, List<String>> wordLists = new HashMap<>();
-		for (String listName: requiredTries) {
+		for (String listName : requiredTries) {
 			List<String> words = new LinkedList<>();
 			wordLists.put(listName, words);
 			String path = config().getValue("word_lists." + listName);

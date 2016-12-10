@@ -23,20 +23,7 @@ public class Pipe {
 	}
 
 	public String graphvizDOT() {
-		StringBuffer buffer = new StringBuffer();
-		buffer.append("digraph DFA {\n");
-		buffer.append("  rankdir=LR;\n");
-		buffer.append("  node [shape=circle];\n");
-		for (Node n : in.connectedNodes()) {
-			buffer.append("  ").append(n.graphvizSpec()).append("\n");
-		}
-		for (Node n : in.connectedNodes()) {
-			for (String s : n.graphvizEdges()) {
-				buffer.append("  ").append(s).append("\n");
-			}
-		}
-		buffer.append("}\n");
-		return buffer.toString();
+		return graphvizDOT("DFA");
 	}
 
 	/**
@@ -63,5 +50,26 @@ public class Pipe {
 				t.trie = trie;
 			}
 		}
+	}
+
+	public String graphvizDOT(String name) {
+		StringBuffer buffer = new StringBuffer();
+		buffer.append("digraph ");
+		buffer.append(name);
+		buffer.append(" {\n");
+		buffer.append("  label=\"").append(name).append("\";\n");
+		buffer.append("  fontsize=20;\n");
+		buffer.append("  rankdir=LR;\n");
+		buffer.append("  node [shape=circle,fontsize=10];\n");
+		for (Node n : in.connectedNodes()) {
+			buffer.append("  ").append(n.graphvizSpec()).append("\n");
+		}
+		for (Node n : in.connectedNodes()) {
+			for (String s : n.graphvizEdges()) {
+				buffer.append("  ").append(s).append("\n");
+			}
+		}
+		buffer.append("}\n");
+		return buffer.toString();
 	}
 }

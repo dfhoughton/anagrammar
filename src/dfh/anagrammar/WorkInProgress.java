@@ -3,9 +3,7 @@ package dfh.anagrammar;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.BlockingDeque;
 
-import dfh.anagrammar.node.End;
 import dfh.anagrammar.node.Node;
 import dfh.anagrammar.node.Terminal;
 

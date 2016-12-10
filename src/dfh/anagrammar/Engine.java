@@ -1,7 +1,9 @@
 package dfh.anagrammar;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,14 +29,26 @@ import dfh.anagrammar.node.Terminal;
  *
  */
 public class Engine {
+	private static final Comparator<Object> RANDOM_COMPARATOR = new Comparator<Object>() {
+		@Override
+		public int compare(Object o1, Object o2) {
+			return Math.random() > 0.5 ? 1 : -1;
+		}
+	};
 	private final CharMap charmap;
 	private final int threads;
 	private final Pipe dfa;
 	private final AtomicBoolean running = new AtomicBoolean(false);
+	private final int sample;
+	private final boolean random, sampling;
+	private final AtomicInteger found = new AtomicInteger();
 
-	public Engine(int threads, Map<String, List<String>> wordLists, Pipe dfa, Builder b)
+	public Engine(int threads, int sample, Boolean random, Map<String, List<String>> wordLists, Pipe dfa, Builder b)
 			throws MissingWordlistException {
 		this.threads = threads;
+		this.sample = sample;
+		this.sampling = sample > 0;
+		this.random = random;
 		this.charmap = makeCharMap(wordLists.values(), b);
 		this.dfa = dfa;
 		Map<String, Trie> tries = makeTries(wordLists);
@@ -53,7 +67,7 @@ public class Engine {
 
 		CharCount cc = charmap.count(inputPhrase);
 		BlockingDeque<WorkInProgress> deque = new LinkedBlockingDeque<>();
-		for (Node n : dfa.in.edges) {
+		for (Node n : edges(dfa.in)) {
 			if (n instanceof Terminal) {
 				Terminal term = (Terminal) n;
 				WorkInProgress wip = new WorkInProgress(term, cc);
@@ -70,6 +84,7 @@ public class Engine {
 		End e = (End) dfa.out;
 		e.setOutput(queue);
 		AtomicInteger activityCounter = new AtomicInteger(deque.size());
+		found.set(0);
 
 		List<Thread> threadsToKill = new ArrayList<>(threads + 1);
 
@@ -103,7 +118,15 @@ public class Engine {
 				} catch (InterruptedException e1) {
 					break;
 				}
+				found.incrementAndGet();
 				handler.handle(wip);
+				if (sampling && found.get() == sample) {
+					running.set(false);
+					synchronized (activityCounter) {
+						activityCounter.notifyAll();
+					}
+					break;
+				}
 				int count = activityCounter.decrementAndGet();
 				if (count == 0) {
 					synchronized (activityCounter) {
@@ -120,7 +143,7 @@ public class Engine {
 
 		// keep the main thread alive until all the work is done
 		synchronized (activityCounter) {
-			while (activityCounter.get() > 0) {
+			while (running.get() && activityCounter.get() > 0) {
 				try {
 					activityCounter.wait(1000);
 				} catch (InterruptedException e1) {
@@ -153,24 +176,22 @@ public class Engine {
 			Trie t = wip.t;
 			boolean active = !cc.empty();
 			if (active) {
-				for (int i : t.jumpList) {
+				for (int i : jumplist(t)) {
 					CharCount cc2 = cc.decrement(i);
 					if (cc2 != null) {
 						Trie t2 = t.children[i];
 						activityCounter.incrementAndGet();
-						WorkInProgress wip2 = new WorkInProgress(t2, n, cc2, wip, false);
-						queue.offerFirst(wip2);
+						enqueue(wip, queue, n, cc2, t2, false);
 					}
 				}
 			}
 			if (t.terminal) {
-				for (Node o2 : n.edges) {
+				for (Node o2 : edges(n)) {
 					if (o2 instanceof Terminal) {
 						if (active) {
 							Terminal term2 = (Terminal) o2;
 							activityCounter.incrementAndGet();
-							WorkInProgress wip2 = new WorkInProgress(term2.trie, o2, cc, wip, true);
-							queue.offerFirst(wip2);
+							enqueue(wip, queue, o2, cc, term2.trie, true);
 						}
 					} else if (!active) { // must be End
 						End e = (End) o2;
@@ -180,6 +201,43 @@ public class Engine {
 				}
 			}
 		}
+	}
+
+	private Node[] edges(Node n) {
+		Node[] edges = n.edges;
+		if (random) {
+			edges = Arrays.copyOf(edges, edges.length);
+			Arrays.parallelSort(edges, RANDOM_COMPARATOR);
+		}
+		return edges;
+	}
+
+	private int[] jumplist(Trie t) {
+		if (random) {
+			int[] jumplist = Arrays.copyOf(t.jumpList, t.jumpList.length);
+			for (int i = 0; i < jumplist.length; i++) {
+				int j = (int) (Math.random() * jumplist.length);
+				int temp = jumplist[i];
+				jumplist[i] = jumplist[j];
+				jumplist[j] = temp;
+			}
+			return jumplist;
+		} else {
+			return t.jumpList;
+		}
+	}
+
+	private void enqueue(WorkInProgress wip, BlockingDeque<WorkInProgress> queue, Node n, CharCount cc2, Trie t2,
+			boolean overEdge) {
+		WorkInProgress wip2 = new WorkInProgress(t2, n, cc2, wip, overEdge);
+		queue.offerFirst(wip2);
+	}
+
+	/**
+	 * @return the number of anagrams handled on the most recent run
+	 */
+	public int found() {
+		return found.get();
 	}
 
 	private Map<String, Trie> makeTries(Map<String, List<String>> wordLists) {
