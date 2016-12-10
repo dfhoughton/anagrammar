@@ -79,3 +79,5 @@ all the anagrams of that phrase that fit within the wordlists and grammar.
     anagrammar where to find the grammar file and the word lists it requires. A 
     specification of the grammar formalism can be found in the README file in the 
     same directory as the configuration file.
+
+The aforementioned README is [here](src/README).
