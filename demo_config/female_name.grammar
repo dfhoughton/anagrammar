@@ -1,4 +1,4 @@
-female_namei       -> female_first_part last_part?
+female_name        -> female_first_part last_part?
 female_name        -> last_part
 female_first_part  -> <female_title> female_post_title?
 female_first_part  -> female_post_title

@@ -48,26 +48,32 @@ public class CLI {
 				{ { Cli.Opt.ARGS, "word", Cli.Opt.PLUS } }, //
 				{ { Cli.Opt.NAME, "anagrammar" } }, //
 				{ { Cli.Opt.VERSION, "0.0.1" } }, //
-				{ { "initialize" }, { "generate a skeleton configuration file in " + configurationDirectory()
-						+ "; you must then modify this configuration file to specify grammars and word lists" } }, //
-				{ { "force" }, { "in conjunction with --initialize, this overwrites an existing configuration file" } }, //
-				{ { "out", 'o', FileCoercion.C }, { "dump output -- anagrams or Graphviz spec -- into this file" } }, //
+				{ { "grammar", 'g', String.class },
+						{ "specify a grammar to use rather than the default listed in " + configFile() } }, //
+				{ { "out", 'o', FileCoercion.C },
+						{ "dump output -- anagrams, grammar, or Graphviz spec -- into this file" } }, //
 				{ { "sample", 's', Integer.class }, { "produce only a sample of anagrams" }, { Range.positive() } }, //
 				{ { "random", 'r' }, { "generate anagrams in random order" } }, //
-				{ { "list", 'l' }, { "list available grammars" } }, //
-				{ { "grammar", 'g', String.class }, { "specify a grammar to use" } }, //
-				{ { "word-lists" }, { "show the list of word lists used by the grammars" } }, //
-				{ { "dot" },
-						{ "print out a Graphviz graph specification for the "
-								+ "finite state automaton representation of a grammar" } }, //
 				{ { "unique", 'u' },
 						{ "in case the grammar can produce the same phrase in more than one way, "
 								+ "this ensures that each name is only listed once; "
 								+ "NOTE: for the sake of memory efficiency and speed, hashcodes are used to determine uniqueness, "
 								+ "so some anagrams may be dropped altogether" } }, //
+				{ { "count", 'c' }, { "print out the number of anagrams found" } }, //
+				{}, //
+				{ { "list", 'l' }, { "list available grammars" } }, //
+				{ { "word-lists" }, { "show the list of word lists used by the grammars" } }, //
+				{ { "dot" },
+						{ "print out a Graphviz graph specification for the "
+								+ "finite state automaton representation of a grammar" } }, //
+				{ { "show-grammar" }, { "dump out the selected grammar" } }, //
+				{}, //
 				{ { "threads", Integer.class, Runtime.getRuntime().availableProcessors() },
 						{ "maximum number of threads" }, { Range.positive() } }, //
-				{ { "count", 'c' }, { "print out the number of anagrams found" } },//
+				{}, //
+				{ { "initialize" }, { "generate a skeleton configuration file in " + configurationDirectory()
+						+ "; you must then modify this configuration file to specify grammars and word lists" } }, //
+				{ { "force" }, { "in conjunction with --initialize, this overwrites an existing configuration file" } }, //
 		};
 		cli = new Cli(spec);
 		cli.parse(args);
@@ -137,6 +143,29 @@ public class CLI {
 				}
 			} catch (IOException | BadConfigurationException e) {
 				cli.die("could not list available word lists:" + e.getMessage());
+			}
+		}
+		if (cli.bool("show-grammar")) {
+			didSomething = true;
+			try {
+				checkConfig();
+				String grammar;
+				if (cli.isSet("grammar"))
+					grammar = cli.string("grammar");
+				else
+					grammar = config().getValue("grammars.default");
+				if (grammar == null)
+					cli.die("grammar " + grammar + " is not defined in the configuration file " + configFile());
+				String fn = config().getValue("grammars.definitions." + grammar);
+				File f = new File( configurationDirectory(), fn);
+				BufferedReader reader = new BufferedReader(new FileReader(f));
+				String line;
+				while ((line = reader.readLine()) != null)
+					out.println(line);
+				reader.close();
+				out.flush();
+			} catch (IOException | BadConfigurationException e) {
+				cli.die("could not produce dot file: " + e.getMessage());
 			}
 		}
 		if (cli.bool("dot")) {
