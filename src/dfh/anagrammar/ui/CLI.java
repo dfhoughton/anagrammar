@@ -53,9 +53,7 @@ public class CLI {
 				{ { "force" }, { "in conjunction with --initialize, this overwrites an existing configuration file" } }, //
 				{ { "out", 'o', FileCoercion.C }, { "dump output -- anagrams or Graphviz spec -- into this file" } }, //
 				{ { "sample", 's', Integer.class }, { "produce only a sample of anagrams" }, { Range.positive() } }, //
-				{ { "random", 'r' },
-						{ "generate anagrams in random order; "
-								+ "WARNING: this will slow the generation of any anagrams considerably" } }, //
+				{ { "random", 'r' }, { "generate anagrams in random order" } }, //
 				{ { "list", 'l' }, { "list available grammars" } }, //
 				{ { "grammar", 'g', String.class }, { "specify a grammar to use" } }, //
 				{ { "word-lists" }, { "show the list of word lists used by the grammars" } }, //
