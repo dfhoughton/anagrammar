@@ -186,15 +186,15 @@ public class Engine {
 				}
 			}
 			if (t.terminal) {
-				for (Node o2 : edges(n)) {
-					if (o2 instanceof Terminal) {
+				for (Node o : edges(n)) {
+					if (o instanceof Terminal) {
 						if (active) {
-							Terminal term2 = (Terminal) o2;
+							Terminal term2 = (Terminal) o;
 							activityCounter.incrementAndGet();
-							enqueue(wip, queue, o2, cc, term2.trie, true);
+							enqueue(wip, queue, o, cc, term2.trie, true);
 						}
 					} else if (!active) { // must be End
-						End e = (End) o2;
+						End e = (End) o;
 						activityCounter.incrementAndGet();
 						e.getOutput().offer(wip);
 					}
@@ -227,9 +227,9 @@ public class Engine {
 		}
 	}
 
-	private void enqueue(WorkInProgress wip, BlockingDeque<WorkInProgress> queue, Node n, CharCount cc2, Trie t2,
+	private void enqueue(WorkInProgress wip, BlockingDeque<WorkInProgress> queue, Node n, CharCount cc, Trie t,
 			boolean overEdge) {
-		WorkInProgress wip2 = new WorkInProgress(t2, n, cc2, wip, overEdge);
+		WorkInProgress wip2 = new WorkInProgress(t, n, cc, wip, overEdge);
 		queue.offerFirst(wip2);
 	}
 

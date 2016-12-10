@@ -54,6 +54,26 @@ for example, that the same rule isn't specified twice:
 The only exception to this lines which are *identical* after the normalization
 of whitespace -- these will trigger an error.
 
+WARNING
+-------
+
+Currently the code that compiles these grammars into automata cannot handle recursion, so
+you can't do this
+
+	rule -> rule | <foo>
+
+or this
+
+	rule       -> other_rule | <foo>
+	other_rule -> rule{3,5}
+
+or anything else that ultimately defines a rule in terms of itself. If you try to do this
+you will get an error during grammar compilation.
+
+If you want anagrammar to handle recursion, I welcome pull requests, but currently I do not
+plan to implement this. Maybe ultimately my OCD will force me to do this, but I do not have
+plans to do this in the near future.
+
 Word Lists
 ==========
 
