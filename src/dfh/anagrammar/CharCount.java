@@ -47,4 +47,14 @@ public class CharCount {
 		this.n = n;
 		this.counts = Arrays.copyOf(counts, counts.length);
 	}
+	
+	@Override
+	public String toString() {
+		StringBuffer b = new StringBuffer();
+		b.append('[');
+		for (int i = 0; i < counts.length - 1; i++)
+			b.append(counts[i]).append(',');
+		b.append(counts[counts.length - 1]).append("](").append(n).append(')');
+		return b.toString();
+	}
 }

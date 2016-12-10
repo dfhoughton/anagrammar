@@ -72,13 +72,6 @@ public class CharMap {
 		}
 
 		public CharMap build() {
-			int biggest = -1;
-			for (char c : counter.keySet()) {
-				int i = (int) c;
-				if (i > biggest) {
-					biggest = i;
-				}
-			}
 			int next = 0;
 			List<Character> order = new ArrayList<Character>(counter.keySet());
 			order.sort(new Comparator<Character>() {
@@ -92,14 +85,14 @@ public class CharMap {
 			for (char c : order) {
 				m.put(c, next++);
 			}
-			return new CharMap(normalizer, m, biggest);
+			return new CharMap(normalizer, m, next);
 		}
 	}
 
-	private CharMap(Normalizer normalizer, Map<Character, Integer> m, int biggest) {
+	private CharMap(Normalizer normalizer, Map<Character, Integer> m, int countSize) {
 		this.normalizer = normalizer;
 		this.map = m;
-		this.countSize = biggest + 1;
+		this.countSize = countSize;
 	}
 
 	public int[] translate(String word) {

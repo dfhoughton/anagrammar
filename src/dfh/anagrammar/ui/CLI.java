@@ -102,7 +102,7 @@ public class CLI {
 			Pipe p = getGrammar(grammar);
 			Map<String, List<String>> wordLists = getWordLists(p.requiredTries());
 			Builder b = new CharMap.Builder();
-			Engine e = new Engine(cli.integer("threads"), 10000, wordLists, p, b);
+			Engine e = new Engine(cli.integer("threads"), wordLists, p, b);
 			e.run(inputPhrase, new OutputHandler() {
 				@Override
 				public void handle(WorkInProgress wip) {

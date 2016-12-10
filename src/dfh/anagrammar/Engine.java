@@ -31,12 +31,10 @@ public class Engine {
 	private final int threads;
 	private final Pipe dfa;
 	private final AtomicBoolean running = new AtomicBoolean(false);
-	private final int queueLimit;
 
-	public Engine(int threads, int queueLimit, Map<String, List<String>> wordLists, Pipe dfa, Builder b)
+	public Engine(int threads, Map<String, List<String>> wordLists, Pipe dfa, Builder b)
 			throws MissingWordlistException {
 		this.threads = threads;
-		this.queueLimit = queueLimit;
 		this.charmap = makeCharMap(wordLists.values(), b);
 		this.dfa = dfa;
 		Map<String, Trie> tries = makeTries(wordLists);
@@ -54,7 +52,7 @@ public class Engine {
 		running.set(true);
 
 		CharCount cc = charmap.count(inputPhrase);
-		BlockingDeque<WorkInProgress> deque = new LinkedBlockingDeque<>(queueLimit);
+		BlockingDeque<WorkInProgress> deque = new LinkedBlockingDeque<>();
 		for (Node n : dfa.in.edges) {
 			if (n instanceof Terminal) {
 				Terminal term = (Terminal) n;
@@ -72,7 +70,7 @@ public class Engine {
 		End e = (End) dfa.out;
 		e.setOutput(queue);
 		AtomicInteger activityCounter = new AtomicInteger(deque.size());
-		
+
 		List<Thread> threadsToKill = new ArrayList<>(threads + 1);
 
 		for (int i = 0; i < threads; i++) {
@@ -116,10 +114,10 @@ public class Engine {
 		});
 		t.setDaemon(true);
 		threadsToKill.add(t);
-		
-		for (Thread th: threadsToKill)
+
+		for (Thread th : threadsToKill)
 			th.start();
-		
+
 		// keep the main thread alive until all the work is done
 		synchronized (activityCounter) {
 			while (activityCounter.get() > 0) {
@@ -130,7 +128,7 @@ public class Engine {
 				}
 			}
 		}
-		for (Thread th: threadsToKill) {
+		for (Thread th : threadsToKill) {
 			th.interrupt();
 		}
 
@@ -142,28 +140,39 @@ public class Engine {
 	}
 
 	private void work(WorkInProgress wip, BlockingDeque<WorkInProgress> queue, AtomicInteger activityCounter) {
-		if (wip.n instanceof End) { // only encounterable if the start sometimes has an edge directly to the end
-			activityCounter.incrementAndGet();
-			((End) wip.n).getOutput().offer(wip);
+		Node n = wip.n;
+		// only encounterable if the start sometimes has an edge directly to the
+		// end
+		if (n instanceof End) {
+			if (wip.cc.empty()) {
+				activityCounter.incrementAndGet();
+				((End) n).getOutput().offer(wip);
+			}
 		} else {
-			Terminal term = (Terminal) wip.n;
-			for (int i : term.trie.jumpList) {
-				CharCount cc2 = wip.cc.decrement(i);
-				if (cc2 != null) {
-					Trie t2 = term.trie.children[i];
-					activityCounter.incrementAndGet();
-					WorkInProgress wip2 = new WorkInProgress(t2, term, cc2, wip, false);
-					queue.offerFirst(wip2);
+			CharCount cc = wip.cc;
+			Trie t = wip.t;
+			boolean active = !cc.empty();
+			if (active) {
+				for (int i : t.jumpList) {
+					CharCount cc2 = cc.decrement(i);
+					if (cc2 != null) {
+						Trie t2 = t.children[i];
+						activityCounter.incrementAndGet();
+						WorkInProgress wip2 = new WorkInProgress(t2, n, cc2, wip, false);
+						queue.offerFirst(wip2);
+					}
 				}
 			}
-			if (wip.t.terminal) {
-				for (Node o2 : term.edges) {
+			if (t.terminal) {
+				for (Node o2 : n.edges) {
 					if (o2 instanceof Terminal) {
-						Terminal term2 = (Terminal) o2;
-						activityCounter.incrementAndGet();
-						WorkInProgress wip2 = new WorkInProgress(term2.trie, o2, wip.cc, wip, true);
-						queue.offerFirst(wip2);
-					} else { // must be End
+						if (active) {
+							Terminal term2 = (Terminal) o2;
+							activityCounter.incrementAndGet();
+							WorkInProgress wip2 = new WorkInProgress(term2.trie, o2, cc, wip, true);
+							queue.offerFirst(wip2);
+						}
+					} else if (!active) { // must be End
 						End e = (End) o2;
 						activityCounter.incrementAndGet();
 						e.getOutput().offer(wip);

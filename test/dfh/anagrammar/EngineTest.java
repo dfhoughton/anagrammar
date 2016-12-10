@@ -19,18 +19,40 @@ import dfh.anagrammar.node.Pipe;
 public class EngineTest {
 
 	@Test
-	public void test() throws BadRuleException, RecursionException, MissingWordlistException {
+	public void simple() throws BadRuleException, RecursionException, MissingWordlistException {
+		String[] bnf = new String[]{"TOP -> <a> <b> <c>"};
 		Map<String, List<String>> wordLists = new HashMap<>();
 		for (String s: "a b c".split(" ")) {
 			List<String> words = new ArrayList<>(1);
 			words.add(s);
 			wordLists.put(s, words);
 		}
-		Pipe p = Grammar.parse(new String[]{"TOP -> <a> <b> <c>"});
+		List<String> outputList = collectMatches("abc", bnf, wordLists);
+		assertEquals(1, outputList.size());
+		assertEquals("a b c", outputList.get(0));
+	}
+	
+	@Test
+	public void multiCharacterSimple() throws BadRuleException, RecursionException, MissingWordlistException {
+			String[] bnf = new String[]{"TOP -> <ab> <bb>"};
+			Map<String, List<String>> wordLists = new HashMap<>();
+			for (String s: "ab bb".split(" ")) {
+				List<String> words = new ArrayList<>(1);
+				words.add(s);
+				wordLists.put(s, words);
+			}
+			List<String> outputList = collectMatches("abbb", bnf, wordLists);
+			assertEquals(1, outputList.size());
+			assertEquals("ab bb", outputList.get(0));
+	}
+
+	private List<String> collectMatches(String input, String[] bnf, Map<String, List<String>> wordLists)
+			throws BadRuleException, RecursionException, MissingWordlistException {
+		Pipe p = Grammar.parse(bnf);
 		Builder b = new Builder();
-		Engine e = new Engine(1, 10, wordLists, p, b);
+		Engine e = new Engine(1, wordLists, p, b);
 		List<String> outputList = new ArrayList<>();
-		e.run("abc", new OutputHandler() {
+		e.run(input, new OutputHandler() {
 			@Override
 			public void handle(WorkInProgress wip) {
 				for (List<String> phrase: wip.phrases()) {
@@ -43,8 +65,7 @@ public class EngineTest {
 				}
 			}
 		});
-		assertEquals(1, outputList.size());
-		assertEquals("a b c", outputList.get(0));
+		return outputList;
 	}
 
 }
