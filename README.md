@@ -26,6 +26,9 @@ all the anagrams of that phrase that fit within the wordlists and grammar.
 
 ## Usage
 
+If you compile the command line utility, it will give you usage information in the usual way.
+Note that you need my [CLI](https://github.com/dfhoughton/cli) library to compile the code. 
+
     ~ $ java -jar anagrammar.jar --help
     USAGE: anagrammar [options] <word>*
 
