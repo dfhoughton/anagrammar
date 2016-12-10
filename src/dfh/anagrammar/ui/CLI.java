@@ -47,7 +47,7 @@ public class CLI {
 						{ "usage.txt" } }, //
 				{ { Cli.Opt.ARGS, "word", Cli.Opt.STAR } }, //
 				{ { Cli.Opt.NAME, "anagrammar" } }, //
-				{ { Cli.Opt.VERSION, "0.0.1" } }, //
+				{ { Cli.Opt.VERSION, "1.0.0" } }, //
 				{ { "grammar", 'g', String.class },
 						{ "specify a grammar to use rather than the default listed in " + configFile() } }, //
 				{ { "out", 'o', FileCoercion.C },
