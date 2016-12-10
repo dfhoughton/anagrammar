@@ -1,0 +1,15 @@
+This utility allows you to generate all the anagrams of a phrase that obey a particular
+grammar. In order to do this it needs a grammar and word lists that define the acceptable
+values of terminal nodes in the grammar. For instance, you might have the grammar
+
+  name -> <first>
+  name -> <last>
+  name -> <first> <last>
+
+This grammar says a name can be a "first" by itself, a "last" by itself, or a "first"
+followed by a "last". Just what these things are must be specified by two word lists:
+first and last. To use this grammar, you must configure this application to find
+the grammar and the word lists. Run the --initialize command if you have not already and
+then edit the configuration file it generates to tell anagrammar where to find the
+grammar file and the word lists it requires. A specification of the grammar formalism
+can be found in the README file in the same directory as the configuration file.

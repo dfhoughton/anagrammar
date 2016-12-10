@@ -45,7 +45,7 @@ public class CLI {
 				//
 				{ { Cli.Opt.USAGE, "compute the anagrams of a phrase that obey a specified grammar" },
 						{ "usage.txt" } }, //
-				{ { Cli.Opt.ARGS, "word", Cli.Opt.PLUS } }, //
+				{ { Cli.Opt.ARGS, "word", Cli.Opt.STAR } }, //
 				{ { Cli.Opt.NAME, "anagrammar" } }, //
 				{ { Cli.Opt.VERSION, "0.0.1" } }, //
 				{ { "grammar", 'g', String.class },
@@ -293,10 +293,10 @@ public class CLI {
 		File f = new File(dir, "README");
 		if (!f.exists()) {
 			PrintStream out = new PrintStream(new BufferedOutputStream(new FileOutputStream(f)));
-			BufferedReader reader = new BufferedReader(new InputStreamReader(CLI.class.getResourceAsStream("README")));
+			BufferedReader reader = new BufferedReader(new InputStreamReader(CLI.class.getResourceAsStream("/README")));
 			String line = null;
 			while ((line = reader.readLine()) != null) {
-				out.println(line.trim());
+				out.println(line);
 			}
 			out.close();
 			reader.close();
