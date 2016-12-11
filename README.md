@@ -47,6 +47,7 @@ Note that you need my [CLI](https://github.com/dfhoughton/cli) library to compil
                                so some anagrams may be dropped altogether
         --count -c             print out the number of anagrams found
 
+        --default      <str>   set the default grammar
         --list -l              list available grammars
         --word-lists           show the list of word lists used by the grammars
         --dot                  print out a Graphviz graph specification for the

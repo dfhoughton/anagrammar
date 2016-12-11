@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project default="create_run_jar" name="Create Runnable Jar for Project Anagrams">
+	<!--this file was created by Eclipse Runnable JAR Export Wizard-->
+	<!--it was then edited by hand-->
+	<!--if you want to use this, you'll also need to edit it to fix paths and such-->
+	<property name="dir.buildfile" value="." />
+	<property name="dir.workspace" value="${dir.buildfile}/.." />
+	<property name="dir.jarfile" value="/Users/houghton" />
+	<target name="create_run_jar">
+		<jar destfile="${user.home}/bin/jars/anagrammar.jar" filesetmanifest="mergewithoutmain">
+			<manifest>
+				<attribute name="Main-Class" value="dfh.anagrammar.ui.CLI" />
+				<attribute name="Class-Path" value="." />
+			</manifest>
+			<fileset file="${dir.buildfile}/src/usage.txt"/>
+			<fileset dir="${dir.buildfile}/bin"/>
+			<fileset dir="${user.home}/git_projects/CLI/bin">
+				<exclude name="usage.txt"/>
+				<exclude name="nit.class"/>
+				<exclude name="GrammarToy.class"/>
+				<exclude name="foo"/>
+				<exclude name="vaarallinen_juhannus.txt"/>
+				<exclude name="**/test/**"/>
+				<exclude name="**/package-info.class"/>
+			</fileset>
+		</jar>
+	</target>
+</project>
