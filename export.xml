@@ -13,6 +13,7 @@
 				<attribute name="Class-Path" value="." />
 			</manifest>
 			<fileset file="${dir.buildfile}/src/usage.txt"/>
+			<fileset file="${dir.buildfile}/src/README"/>
 			<fileset dir="${dir.buildfile}/bin"/>
 			<fileset dir="${user.home}/git_projects/CLI/bin">
 				<exclude name="usage.txt"/>
