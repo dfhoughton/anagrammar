@@ -1,11 +1,14 @@
 # a simple key-value map after the style of YAML; see README
 grammars:
   # these define the grammars available to anagrammar
-  default: name
+  default: simple_name
   definitions:
-    name:        name.grammar
-    female_name: female_name.grammar
-    male_name:   male_name.grammar
+    name:          name.grammar
+    female_name:   female_name.grammar
+    male_name:     male_name.grammar
+    simple_name:   simple_name.grammar
+    simple_female: simple_female_name.grammar
+    simple_male:   simple_male_name.grammar
 word_lists:
   # these define the words and list names available to the grammars
   female:       female.txt

@@ -61,6 +61,7 @@ public class CLI {
 								+ "so some anagrams may be dropped altogether" } }, //
 				{ { "count", 'c' }, { "print out the number of anagrams found" } }, //
 				{}, //
+				{ { "default", String.class }, { "set the default grammar" } }, //
 				{ { "list", 'l' }, { "list available grammars" } }, //
 				{ { "word-lists" }, { "show the list of word lists used by the grammars" } }, //
 				{ { "dot" },
@@ -118,6 +119,21 @@ public class CLI {
 				cli.die("could not list available grammars: " + e.getMessage());
 			}
 		}
+		if (cli.isSet("default")) {
+			didSomething = true;
+			try {
+				checkConfig();
+				Set<String> available = new HashSet<>(config().getKeys("grammars.definitions"));
+				String grammar = cli.string("default");
+				if (!available.contains(grammar))
+					cli.die(grammar + " is not among the known grammars");
+				config.setValue("grammars.default", grammar);
+				Yamlizer.save(config(), configFile());
+				System.out.println(grammar + " is now the default grammar");
+			} catch (IOException | BadConfigurationException e) {
+				cli.die("could not set the default grammars: " + e.getMessage());
+			}
+		}
 		if (cli.bool("word-lists")) {
 			didSomething = true;
 			try {
@@ -157,7 +173,7 @@ public class CLI {
 				if (grammar == null)
 					cli.die("grammar " + grammar + " is not defined in the configuration file " + configFile());
 				String fn = config().getValue("grammars.definitions." + grammar);
-				File f = new File( configurationDirectory(), fn);
+				File f = new File(configurationDirectory(), fn);
 				BufferedReader reader = new BufferedReader(new FileReader(f));
 				String line;
 				while ((line = reader.readLine()) != null)

@@ -105,9 +105,10 @@ public class Yamlizer {
 		private ConfigurationNode lastChild() {
 			ConfigurationNode n = null;
 			// the linked hashmap should preserve insertion order
-			// I'd think the collection would therefore expose a method which lets you do this
+			// I'd think the collection would therefore expose a method which
+			// lets you do this
 			// directly, but if so I missed it
-			for (ConfigurationNode n2: children.values())
+			for (ConfigurationNode n2 : children.values())
 				n = n2;
 			return n;
 		}
@@ -139,6 +140,17 @@ public class Yamlizer {
 			if (node == null)
 				return null;
 			return node.value;
+		}
+
+		/**
+		 * Change the value of a node
+		 * @param path
+		 * @param value
+		 * @throws BadConfigurationException
+		 */
+		public void setValue(String path, String value) throws BadConfigurationException {
+			ConfigurationNode node = getNode(path);
+			node.value = value;
 		}
 
 		ConfigurationNode getNode(String path) throws BadConfigurationException {
