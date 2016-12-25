@@ -68,6 +68,7 @@ public class CLI {
 						{ "print out a Graphviz graph specification for the "
 								+ "finite state automaton representation of a grammar" } }, //
 				{ { "show-grammar" }, { "dump out the selected grammar" } }, //
+				{ { "show-words", String.class }, { "print the chose word list to stdout" } }, //
 				{}, //
 				{ { "threads", Integer.class, Runtime.getRuntime().availableProcessors() },
 						{ "maximum number of threads" }, { Range.positive() } }, //
@@ -82,12 +83,7 @@ public class CLI {
 		boolean didSomething = false;
 		boolean unique = cli.bool("unique");
 		if (cli.isSet("out")) {
-			File outFile = (File) cli.object("out");
-			try {
-				out = new PrintStream(new BufferedOutputStream(new FileOutputStream(outFile)), true);
-			} catch (FileNotFoundException e) {
-				cli.die("could not write to " + outFile);
-			}
+			setOut();
 		}
 		if (cli.bool("initialize")) {
 			didSomething = true;
@@ -103,104 +99,27 @@ public class CLI {
 		}
 		if (cli.bool("list")) {
 			didSomething = true;
-			try {
-				checkConfig();
-				String defaultGrammar = config().getValue("grammars.default");
-				System.out.println("available grammars:");
-				for (String g : config().getKeys("grammars.definitions")) {
-					System.out.print("  ");
-					System.out.print(g);
-					if (g.equals(defaultGrammar))
-						System.out.println(" (default)");
-					else
-						System.out.println();
-				}
-			} catch (IOException | BadConfigurationException e) {
-				cli.die("could not list available grammars: " + e.getMessage());
-			}
+			listGrammars();
 		}
 		if (cli.isSet("default")) {
 			didSomething = true;
-			try {
-				checkConfig();
-				Set<String> available = new HashSet<>(config().getKeys("grammars.definitions"));
-				String grammar = cli.string("default");
-				if (!available.contains(grammar))
-					cli.die(grammar + " is not among the known grammars");
-				config.setValue("grammars.default", grammar);
-				Yamlizer.save(config(), configFile());
-				System.out.println(grammar + " is now the default grammar");
-			} catch (IOException | BadConfigurationException e) {
-				cli.die("could not set the default grammars: " + e.getMessage());
-			}
+			setDefaultGrammar();
 		}
 		if (cli.bool("word-lists")) {
 			didSomething = true;
-			try {
-				checkConfig();
-				System.out.println("available word lists:");
-				Map<String, String> wordLists = new TreeMap<>();
-				for (String w : config.getKeys("word_lists")) {
-					String v = config.getValue("word_lists." + w);
-					wordLists.put(w, v);
-				}
-				if (wordLists.isEmpty())
-					System.out.println("no word lists configured!");
-				else {
-					int nm = -1;
-					for (String s : wordLists.keySet()) {
-						int n = s.length() + 1;
-						if (n > nm)
-							nm = n;
-					}
-					for (Entry<String, String> e : wordLists.entrySet()) {
-						System.out.printf("  %-" + nm + "s %s\n", e.getKey() + ':', e.getValue());
-					}
-				}
-			} catch (IOException | BadConfigurationException e) {
-				cli.die("could not list available word lists:" + e.getMessage());
-			}
+			showWordLists();
 		}
 		if (cli.bool("show-grammar")) {
 			didSomething = true;
-			try {
-				checkConfig();
-				String grammar;
-				if (cli.isSet("grammar"))
-					grammar = cli.string("grammar");
-				else
-					grammar = config().getValue("grammars.default");
-				if (grammar == null)
-					cli.die("grammar " + grammar + " is not defined in the configuration file " + configFile());
-				String fn = config().getValue("grammars.definitions." + grammar);
-				File f = new File(configurationDirectory(), fn);
-				BufferedReader reader = new BufferedReader(new FileReader(f));
-				String line;
-				while ((line = reader.readLine()) != null)
-					out.println(line);
-				reader.close();
-				out.flush();
-			} catch (IOException | BadConfigurationException e) {
-				cli.die("could not produce dot file: " + e.getMessage());
-			}
+			showGrammar();
 		}
 		if (cli.bool("dot")) {
 			didSomething = true;
-			try {
-				checkConfig();
-				String grammar;
-				if (cli.isSet("grammar"))
-					grammar = cli.string("grammar");
-				else
-					grammar = config().getValue("grammars.default");
-				if (grammar == null)
-					cli.die("grammar " + grammar + " is not defined in the configuration file " + configFile());
-				Pipe p = getGrammar(grammar);
-				out.println(p.graphvizDOT(grammar));
-				out.flush();
-			} catch (IOException | BadConfigurationException | BadRuleException | RecursionException e) {
-				cli.die("could not produce dot file: " + e.getMessage());
-			}
+			makeDotSpecification();
+		}
+		if (cli.isSet("show-words")) {
+			didSomething = true;
+			listWords();
 		}
 		if (didSomething)
 			return;
@@ -254,6 +173,134 @@ public class CLI {
 		} catch (IOException | BadConfigurationException | BadRuleException | RecursionException
 				| MissingWordlistException e) {
 			cli.die(e.getMessage());
+		}
+	}
+
+	private static void listWords() {
+		try {
+			checkConfig();
+			String list = cli.string("show-words");
+			if (!config.getKeys("word_lists").contains(list))
+				cli.die("unfamiliar word list: " + list);
+			File f = new File(configurationDirectory(), config.getValue("word_lists." + list));
+			BufferedReader reader = new BufferedReader(new FileReader(f));
+			String line = null;
+			System.out.printf("words in %s\n\n", list);
+			while ((line = reader.readLine()) != null)
+				System.out.println(line);
+			reader.close();
+		} catch (IOException | BadConfigurationException e) {
+			cli.die("could not read word list file:" + e.getMessage());
+		}
+	}
+
+	private static void makeDotSpecification() {
+		try {
+			checkConfig();
+			String grammar;
+			if (cli.isSet("grammar"))
+				grammar = cli.string("grammar");
+			else
+				grammar = config().getValue("grammars.default");
+			if (grammar == null)
+				cli.die("grammar " + grammar + " is not defined in the configuration file " + configFile());
+			Pipe p = getGrammar(grammar);
+			out.println(p.graphvizDOT(grammar));
+			out.flush();
+		} catch (IOException | BadConfigurationException | BadRuleException | RecursionException e) {
+			cli.die("could not produce dot file: " + e.getMessage());
+		}
+	}
+
+	private static void showGrammar() {
+		try {
+			checkConfig();
+			String grammar;
+			if (cli.isSet("grammar"))
+				grammar = cli.string("grammar");
+			else
+				grammar = config().getValue("grammars.default");
+			if (grammar == null)
+				cli.die("grammar " + grammar + " is not defined in the configuration file " + configFile());
+			String fn = config().getValue("grammars.definitions." + grammar);
+			File f = new File(configurationDirectory(), fn);
+			BufferedReader reader = new BufferedReader(new FileReader(f));
+			String line;
+			while ((line = reader.readLine()) != null)
+				out.println(line);
+			reader.close();
+			out.flush();
+		} catch (IOException | BadConfigurationException e) {
+			cli.die("could not produce dot file: " + e.getMessage());
+		}
+	}
+
+	private static void showWordLists() {
+		try {
+			checkConfig();
+			System.out.println("available word lists:");
+			Map<String, String> wordLists = new TreeMap<>();
+			for (String w : config.getKeys("word_lists")) {
+				String v = config.getValue("word_lists." + w);
+				wordLists.put(w, v);
+			}
+			if (wordLists.isEmpty())
+				System.out.println("no word lists configured!");
+			else {
+				int nm = -1;
+				for (String s : wordLists.keySet()) {
+					int n = s.length() + 1;
+					if (n > nm)
+						nm = n;
+				}
+				for (Entry<String, String> e : wordLists.entrySet()) {
+					System.out.printf("  %-" + nm + "s %s\n", e.getKey() + ':', e.getValue());
+				}
+			}
+		} catch (IOException | BadConfigurationException e) {
+			cli.die("could not list available word lists:" + e.getMessage());
+		}
+	}
+
+	private static void setDefaultGrammar() {
+		try {
+			checkConfig();
+			Set<String> available = new HashSet<>(config().getKeys("grammars.definitions"));
+			String grammar = cli.string("default");
+			if (!available.contains(grammar))
+				cli.die(grammar + " is not among the known grammars");
+			config.setValue("grammars.default", grammar);
+			Yamlizer.save(config(), configFile());
+			System.out.println(grammar + " is now the default grammar");
+		} catch (IOException | BadConfigurationException e) {
+			cli.die("could not set the default grammars: " + e.getMessage());
+		}
+	}
+
+	private static void listGrammars() {
+		try {
+			checkConfig();
+			String defaultGrammar = config().getValue("grammars.default");
+			System.out.println("available grammars:");
+			for (String g : config().getKeys("grammars.definitions")) {
+				System.out.print("  ");
+				System.out.print(g);
+				if (g.equals(defaultGrammar))
+					System.out.println(" (default)");
+				else
+					System.out.println();
+			}
+		} catch (IOException | BadConfigurationException e) {
+			cli.die("could not list available grammars: " + e.getMessage());
+		}
+	}
+
+	private static void setOut() {
+		File outFile = (File) cli.object("out");
+		try {
+			out = new PrintStream(new BufferedOutputStream(new FileOutputStream(outFile)), true);
+		} catch (FileNotFoundException e) {
+			cli.die("could not write to " + outFile);
 		}
 	}
 
